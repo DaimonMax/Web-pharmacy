@@ -1,65 +1,247 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+
+import { AuthProvider, useAuth } from '@/context/authContext';
+import { CartProvider, useCart } from '@/context/cartContext';
+import { WishlistProvider, useWishlist } from '@/context/wishlistContext';
+import { PrescriptionsProvider, usePrescriptions } from '@/context/prescriptionContext';
+import { CatalogProvider, useCatalog } from '@/context/catalogContext';
+import { OrdersProvider, useOrders } from '@/context/ordersContext';
+import { ThemeProvider } from '@/context/themeContext';
+
+import { useDeletePrescription } from '@/hooks/useDeletePrescription';
+import { usePlaceOrder } from '@/hooks/usePlaceOrder';
+
+import { Header } from '@/components/major/header';
+import { Footer } from '@/components/major/footer';
+import { MainContent } from '@/components/major/mainContent';
+import { Toast } from '@/components/toast';
+
+import { CartSidebar } from '@/components/modals/cartSideBar';
+import { ProductModal } from '@/components/modals/product';
+import { AccountModal } from '@/components/modals/account';
+import { AttachRecipeModal } from '@/components/modals/attachRecipe';
+import { CheckoutModal } from '@/components/modals/checkout';
+import { OrdersModal } from '@/components/modals/orders';
+import { AdminOrdersModal } from '@/components/modals/adminPanel';
+import { RecipeModal } from '@/components/modals/recipe';
+
+import { Product } from '@/shared/types/product';
+import { PrescriptionWithAttachment } from '@/shared/types/prescription';
+import { CartPeekTab } from '@/components/additional_markup/cartPeekTab';
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <ThemeProvider>
+      <AuthProvider>
+        <CartProvider>
+          <WishlistProvider>
+            <PrescriptionsProvider>
+              <CatalogProvider>
+                <OrdersProvider>
+                  <HomeContent />
+                </OrdersProvider>
+              </CatalogProvider>
+            </PrescriptionsProvider>
+          </WishlistProvider>
+        </CartProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+type ActiveModal =
+  | 'cart'
+  | 'product'
+  | 'account'
+  | 'attachRecipe'
+  | 'checkout'
+  | 'orders'
+  | 'admin'
+  | 'recipe'
+  | null;
+
+function HomeContent() {
+  const { user, login, register, logout } = useAuth();
+  const cart = useCart();
+  const wishlist = useWishlist();
+  const prescriptions = usePrescriptions();
+  const catalog = useCatalog();
+  const orders = useOrders();
+
+  const deletePrescription = useDeletePrescription();
+  const placeOrder = usePlaceOrder();
+
+  const [currentView, setCurrentView] = useState<'meds' | 'advice' | 'wishlist' | 'kids'>('meds');
+
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [attachRecipeProduct, setAttachRecipeProduct] = useState<Product | null>(null);
+  const [hasCartOpenedOnce, setHasCartOpenedOnce] = useState(false);
+
+  const closeModal = () => setActiveModal(null);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2500);
+  };
+
+  const openProduct = (product: Product) => {
+    setSelectedProduct(product);
+    setActiveModal('product');
+  };
+
+  const requireRecipe = (product: Product) => {
+    setAttachRecipeProduct(product);
+    setActiveModal('attachRecipe');
+  };
+
+  const requireAuth = () => {
+    setActiveModal('account');
+    showToast('Увійдіть, щоб продовжити');
+  };
+
+  useEffect(() => {
+    if (activeModal === 'orders') orders.refreshMyOrders();
+    if (activeModal === 'admin') orders.refreshAdminOrders();
+  }, [activeModal]); 
+
+  const recipesWithAttachment: PrescriptionWithAttachment[] = prescriptions.prescriptions.map((rx) => {
+    const entry = Object.entries(prescriptions.attachedPrescriptions).find(([, rxId]) => rxId === rx.id);
+    const attachedProductId = entry ? Number(entry[0]) : null;
+    const attachedProductName =
+      attachedProductId != null ? catalog.getLoadedProductById(attachedProductId)?.name ?? null : null;
+    return { ...rx, attachedProductId, attachedProductName };
+  });
+
+  const cartTotal = cart.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return (
+    <>
+      <Header
+        onOpenCart={() => { setActiveModal('cart'); setHasCartOpenedOnce(true);}}
+        onOpenAccount={() => setActiveModal('account')}
+        onOpenOrders={() => setActiveModal('orders')}
+        onOpenAdmin={() => setActiveModal('admin')}
+        onOpenRecipeUpload={() => setActiveModal('recipe')}
+        onRequireAuth={requireAuth}
+        onNavigateToView={setCurrentView}
+      />
+
+      <MainContent
+        currentView={currentView}
+        onNavigateToCatalog={() => setCurrentView('meds')}
+        onOpenProduct={openProduct}
+        onRequireRecipe={requireRecipe}
+        onRequireAuth={requireAuth}
+      />
+
+      <Footer />
+
+      <CartSidebar
+        isOpen={activeModal === 'cart'}
+        onClose={closeModal}
+        onCheckout={() => setActiveModal('checkout')}
+      />
+
+      <ProductModal
+        isOpen={activeModal === 'product'}
+        onClose={closeModal}
+        product={selectedProduct}
+        onRequireRecipe={requireRecipe}
+        onRequireAuth={requireAuth}
+      />
+
+      <AccountModal
+        isOpen={activeModal === 'account'}
+        onClose={closeModal}
+        user={user}
+        onLogin={async (credentials) => {
+          await login(credentials);
+          showToast('Ласкаво просимо!');
+          closeModal();
+        }}
+        onRegister={async (data) => {
+          await register(data);
+          showToast(`Реєстрація успішна! Вітаємо, ${data.name}`);
+          closeModal();
+        }}
+        onLogout={() => {
+          logout();
+          catalog.clearSearch();
+          showToast('Ви вийшли з акаунту');
+        }}
+      />
+
+      <AttachRecipeModal
+        isOpen={activeModal === 'attachRecipe'}
+        onClose={closeModal}
+        productId={attachRecipeProduct?.id}
+        productName={attachRecipeProduct?.name}
+        recipes={recipesWithAttachment}
+        attachedRecipeId={
+          attachRecipeProduct ? prescriptions.getAttachedPrescriptionId(attachRecipeProduct.id) ?? null : null
+        }
+        onSelectRecipe={(recipeId) => {
+          if (!attachRecipeProduct) return;
+          prescriptions.attach(attachRecipeProduct.id, recipeId);
+          showToast('Рецепт прикріплено');
+          closeModal();
+        }}
+        onOpenUploadModal={() => setActiveModal('recipe')}
+      />
+
+      <CheckoutModal
+        isOpen={activeModal === 'checkout'}
+        onClose={closeModal}
+        totalAmount={cartTotal}
+        onOrderComplete={async ({ city, street, house }) => {
+          await placeOrder(`${city}, ${street}, ${house}`);
+          showToast('Замовлення успішно створено!');
+        }}
+      />
+
+      <OrdersModal
+        isOpen={activeModal === 'orders'}
+        onClose={closeModal}
+        orders={orders.myOrders}
+        isAdmin={false}
+      />
+
+      <AdminOrdersModal
+        isOpen={activeModal === 'admin'}
+        onClose={closeModal}
+        orders={orders.adminOrders}
+        isLoading={orders.isAdminOrdersLoading}
+        onUpdateStatus={orders.updateStatus}
+        onUpdateAddress={orders.updateAddress}
+        onDeleteItem={orders.removeItem}
+      />
+
+      <RecipeModal
+        isOpen={activeModal === 'recipe'}
+        onClose={closeModal}
+        existingRecipes={recipesWithAttachment}
+        onSaveRecipe={async ({ title, file }) => {
+          await prescriptions.upload(title, file);
+          showToast('Рецепт збережено');
+        }}
+        onDeleteRecipe={async (id) => {
+          await deletePrescription(id);
+          showToast('Рецепт видалено');
+        }}
+      />
+
+      <Toast message={toastMessage} isVisible={toastVisible} />
+
+      <CartPeekTab
+        visible={hasCartOpenedOnce && activeModal !== 'cart'}
+        onHover={() => setActiveModal('cart')}
+      />
+    </>
   );
 }

@@ -1,0 +1,119 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String
+  products Product[]
+}
+
+model Variety {
+  id       Int       @id @default(autoincrement())
+  name     String
+  products Product[]
+}
+
+model Product {
+  id               Int            @id @default(autoincrement())
+  name             String
+  description      String
+  composition      String
+  manufacturer     String
+  price            Float
+  categoryId       Int
+  varietyId        Int
+  isRecipeRequired Boolean        @default(false)
+  isForChildren    Boolean        @default(false)
+  imageUrl         String?
+
+  category     Category       @relation(fields: [categoryId], references: [id])
+  variety      Variety        @relation(fields: [varietyId], references: [id])
+  cartItems    CartItem[]
+  wishlist     WishlistItem[]
+  dailyDeals   DailyDeal[]
+  orderItems   OrderItem[]
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
+  passwordHash String
+  name         String
+  phone        String         @unique
+  isAdmin      Boolean        @default(false)
+
+  cartItems    CartItem[]
+  orders       Order[]
+  prescriptions Prescription[]
+  wishlist     WishlistItem[]
+}
+
+model CartItem {
+  id             Int  @id @default(autoincrement())
+  userId         Int
+  productId      Int
+  quantity       Int
+  prescriptionId Int?
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  userId          Int
+  createdAt       DateTime    @default(now())
+  status          String      @default("unconfirmed")
+  totalPrice      Float
+  deliveryAddress String
+  items           OrderItem[]
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model OrderItem {
+  id             Int   @id @default(autoincrement())
+  orderId        Int
+  productId      Int
+  productName    String
+  quantity       Int
+  price          Float
+  prescriptionId Int?
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Prescription {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  imagePath  String
+  photoHash  String
+  title      String
+  uploadedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model WishlistItem {
+  id        Int @id @default(autoincrement())
+  userId    Int
+  productId Int
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model DailyDeal {
+  id            Int @id @default(autoincrement())
+  productId     Int
+  expiresAtUnix Int
+
+  product Product @relation(fields: [productId], references: [id])
+}
